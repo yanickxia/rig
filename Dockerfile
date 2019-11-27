@@ -7,6 +7,7 @@ RUN cargo build --release
 FROM alpine
 WORKDIR /app
 ENV RUST_LOG=info
+ADD config/ .
 COPY --from=0 /build/target/release/rig-demo .
 CMD ./rig-demo
 
