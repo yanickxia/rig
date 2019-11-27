@@ -1,0 +1,11 @@
+{
+  "apis": [
+    {
+      "id": 1,
+      "path": "/test/{args}",
+      "destination": {
+        "destination": "http://localhost:10083/test/{args}"
+      }
+    }
+  ]
+}

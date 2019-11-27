@@ -1,0 +1,12 @@
+[package]
+name = "rig-demo"
+version = "0.1.0"
+authors = ["yanick <yanick.xia@daocloud.io>"]
+edition = "2018"
+
+[dependencies]
+rig = {version = "0.1.0", path = "./rig"}
+tokio = "0.1"
+futures = "0.1"
+log = "0.4"
+env_logger = "0.7.1"

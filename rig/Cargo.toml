@@ -1,0 +1,20 @@
+[package]
+name = "rig"
+version = "0.1.0"
+authors = ["yanick <yanick.xia@daocloud.io>"]
+edition = "2018"
+
+
+[dependencies]
+log = "0.4"
+actix-web = "1.0.9"
+actix-router = "0.1.5"
+actix-http = "0.2.11"
+awc = "0.2.8"
+futures = "0.1.25"
+config = "0.9"
+lazy_static = "1.4.0"
+serde_derive = "^1.0.8"
+serde = "^1.0.8"
+derive_more = "0.14.0"
+downcast-rs = "1.1.1"
