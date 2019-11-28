@@ -9,7 +9,7 @@ use crate::error::RigError;
 pub mod handlers;
 #[cfg(test)]
 pub mod handlers_tests;
-pub mod handler_factory;
+pub mod handlers_factory;
 
 
 pub struct Request<'a> {
@@ -34,19 +34,21 @@ pub trait Handler {
 
 pub struct Exchange<'a> {
     api: RefCell<Option<Api>>,
-    pub handler_chain: HandlerChain<'a>,
+    pub handler_chain: &'a HandlerChain<'a>,
     context: RefCell<Context>,
 }
 
-impl Default for Exchange<'_> {
-    fn default() -> Self {
+
+impl<'a> Exchange<'a> {
+    pub fn new(handler_chain: &'a HandlerChain<'a>) -> Self {
         Exchange {
             api: RefCell::new(Option::None),
-            handler_chain: Default::default(),
+            handler_chain,
             context: RefCell::new(Context::default()),
         }
     }
 }
+
 
 pub struct Context {
     pub destination: Option<String>

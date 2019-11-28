@@ -94,6 +94,11 @@ impl Handler for DirectDispatcher {
                 dest = dest.replace(replace_key.as_str(), v);
             });
 
+        let dest = match req.req.uri().query() {
+            Some(query) => { dest + "?" + query }
+            None => dest
+        };
+
         debug!("DirectDispatcher Final Dest: {}", dest);
         exchange.context.borrow_mut().destination = Option::Some(dest);
         exchange.handler_chain.handle(req, exchange)
@@ -116,24 +121,26 @@ impl Handler for AgentRequestHandler {
         let context = exchange.context.borrow_mut();
         let destination = context.destination.as_ref().unwrap();
 
-        Box::new(self.client.request(req.req.method().clone(), destination)
-            .send_body(req.body.clone())
-            .map_err(|_| RigError::AgentRequest)
-            .map(|mut res| {
-                let mut client_resp = HttpResponse::build(res.status());
-                // Remove `Connection` as per
-                // https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Connection#Directives
-                for (header_name, header_value) in
-                    res.headers().iter().filter(|(h, _)| *h != "connection")
-                    {
-                        client_resp.header(header_name.clone(), header_value.clone());
-                    }
-                res.body()
-                    .into_stream()
-                    .concat2()
-                    .map(move |b| client_resp.body(b))
-                    .map_err(|e| RigError::AgentResponse)
-            })
-            .flatten())
+        Box::new(
+            self.client
+                .request(req.req.method().clone(), destination)
+                .send_body(req.body.clone())
+                .map_err(|_| RigError::AgentRequest)
+                .map(|mut res| {
+                    let mut client_resp = HttpResponse::build(res.status());
+                    // Remove `Connection` as per
+                    // https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Connection#Directives
+                    for (header_name, header_value) in
+                        res.headers().iter().filter(|(h, _)| *h != "connection")
+                        {
+                            client_resp.header(header_name.clone(), header_value.clone());
+                        }
+                    res.body()
+                        .into_stream()
+                        .concat2()
+                        .map(move |b| client_resp.body(b))
+                        .map_err(|e| RigError::AgentResponse)
+                })
+                .flatten())
     }
 }
