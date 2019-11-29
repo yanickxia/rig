@@ -1,12 +1,11 @@
 use std::convert::TryFrom;
 
 use actix_router::{Path, ResourceDef, Router};
-use actix_web::{HttpRequest, HttpResponse};
 use actix_web::client::Client;
-use awc::ClientResponse;
+use actix_web::HttpResponse;
 use futures::{Future, Stream};
-use futures::future::{err, ok};
-use log::{debug, info};
+use futures::future::err;
+use log::{debug, error, info};
 
 use crate::api::Api;
 use crate::error::RigError;
@@ -125,7 +124,10 @@ impl Handler for AgentRequestHandler {
             self.client
                 .request(req.req.method().clone(), destination)
                 .send_body(req.body.clone())
-                .map_err(|_| RigError::AgentRequest)
+                .map_err(|e| {
+                    error!("send request error {}", e);
+                    RigError::AgentRequest
+                })
                 .map(|mut res| {
                     let mut client_resp = HttpResponse::build(res.status());
                     // Remove `Connection` as per
@@ -139,7 +141,10 @@ impl Handler for AgentRequestHandler {
                         .into_stream()
                         .concat2()
                         .map(move |b| client_resp.body(b))
-                        .map_err(|e| RigError::AgentResponse)
+                        .map_err(|e| {
+                            error!("payload error {}", e);
+                            RigError::AgentResponse
+                        })
                 })
                 .flatten())
     }

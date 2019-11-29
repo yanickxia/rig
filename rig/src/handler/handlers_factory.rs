@@ -1,8 +1,7 @@
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock,Mutex};
 
 use crate::config::settings;
-use crate::handler::{Handler, HandlerChain};
+use crate::handler::{Handler};
 use crate::handler::handlers::{AgentRequestHandler, DirectDispatcher, RouterHandler};
 
 pub struct HandlerFactory {

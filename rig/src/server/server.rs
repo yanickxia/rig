@@ -1,17 +1,14 @@
-use std::borrow::Borrow;
 use std::net::SocketAddr;
-use std::ops::Deref;
 
 use actix_web::{
     App, HttpRequest, HttpResponse, HttpServer, web,
 };
 use futures::Future;
-use futures::future::ok;
-use log::{debug, info};
+use log::{info};
 
 use crate::config::settings;
 use crate::error::RigError;
-use crate::handler::{Exchange, Handler, HandlerChain, Request};
+use crate::handler::{Exchange, HandlerChain, Request};
 use crate::handler::handlers::{AgentRequestHandler, DirectDispatcher, RouterHandler};
 use crate::handler::handlers_factory::HandlerFactory;
 
@@ -28,7 +25,7 @@ fn forward(req: HttpRequest,
         .append(*factory.get(std::any::type_name::<DirectDispatcher>()).as_ref())
         .append(*factory.get(std::any::type_name::<AgentRequestHandler>()).as_ref());
 
-    let mut exchange = Exchange::new(&handler_chain);
+    let exchange = Exchange::new(&handler_chain);
     exchange.handler_chain.first().handle(&Request::new(&req, &body), &exchange)
 }
 

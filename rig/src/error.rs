@@ -1,5 +1,5 @@
-use derive_more::Display;
 use actix_web::{HttpResponse, ResponseError};
+use derive_more::Display;
 
 #[derive(Debug, Display, PartialEq)]
 pub enum RigError {
@@ -9,10 +9,10 @@ pub enum RigError {
     #[display(fmt = "not found path")]
     NotFoundPath,
 
-    #[display(fmt = "proxy request fail")]
+    #[display(fmt = "proxy request error")]
     AgentRequest,
 
-    #[display(fmt = "proxy response fail")]
+    #[display(fmt = "proxy response error")]
     AgentResponse,
 }
 
