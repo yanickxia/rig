@@ -19,6 +19,14 @@ spec:
           image: {{rig.image}}
           ports:
             - containerPort: 9032
+          resources:
+            requests:
+              memory: "4096Mi"
+              cpu: "2000m"
+            limits:
+              memory: "4096Mi"
+              cpu: "2000m"
+
 ---
 apiVersion: v1
 kind: Service
