@@ -2,5 +2,5 @@ FROM alpine:latest
 WORKDIR /app
 ENV RUST_LOG=info
 ADD $PWD/config/ /app/config/
-ADD $PWD/target/release/rig-demo .
+ADD $PWD/target/x86_64-unknown-linux-musl/release .
 CMD rig-demo
