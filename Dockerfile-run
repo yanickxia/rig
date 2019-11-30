@@ -1,4 +1,4 @@
-FROM debian:buster
+alpine:latest
 WORKDIR /app
 ENV RUST_LOG=info
 ADD $PWD/config/ /app/config/
