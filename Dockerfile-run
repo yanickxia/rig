@@ -3,4 +3,4 @@ WORKDIR /app
 ENV RUST_LOG=info
 ADD $PWD/config/ /app/config/
 ADD $PWD/target/x86_64-unknown-linux-musl/release/rig-demo .
-CMD rig-demo
+CMD ./rig-demo
