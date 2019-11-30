@@ -1,6 +1,6 @@
 FROM debian:buster
 WORKDIR /app
 ENV RUST_LOG=info
-ADD config/ /app/config/
-ADD target/release/rig-demo .
+ADD $PWD/config/ /app/config/
+ADD $PWD/target/release/rig-demo .
 CMD rig-demo
