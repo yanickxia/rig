@@ -2,5 +2,5 @@ FROM debian:buster
 WORKDIR /app
 ENV RUST_LOG=info
 ADD config/ /app/config/
-COPY target/release/rig-demo .
+ADD target/release/rig-demo .
 CMD rig-demo
