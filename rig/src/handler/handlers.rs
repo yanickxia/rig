@@ -1,3 +1,5 @@
+use std::borrow::BorrowMut;
+use std::cell::RefCell;
 use std::convert::TryFrom;
 
 use actix_router::{Path, ResourceDef, Router};
@@ -9,83 +11,78 @@ use log::{debug, error, info};
 
 use crate::api::Api;
 use crate::error::RigError;
-use crate::handler::{Exchange, Handler, Request};
+use crate::handler::{CONTINUE, Exchange, Filter, FutureResponse, Handler, Request};
+use crate::handler::filters_factory::FilterFactory;
 
-pub struct RouterHandler<'a> {
-    routers: Router<&'a Api>
+/// HandlerChain
+pub struct ComposeHandler {
+    current: RefCell<usize>,
+    handlers: Vec<Box<dyn Handler>>,
 }
 
-/// Router handler
-impl<'a> RouterHandler<'a> {
-    pub fn new(apis: &'a Vec<Api>) -> Self {
-        let mut router_builder = Router::<&Api>::build();
-
-        apis.iter().for_each(
-            |it| {
-                let v = u16::try_from(it.id).unwrap();
-                router_builder.path(it.path.as_str(), it).0.set_id(v);
-            });
-
-        RouterHandler {
-            routers: router_builder.finish()
-        }
-    }
-}
-
-
-impl Default for RouterHandler<'_> {
+impl Default for ComposeHandler {
     fn default() -> Self {
-        let router_builder = Router::<&Api>::build();
-        RouterHandler {
-            routers: router_builder.finish()
+        ComposeHandler {
+            current: RefCell::new(0),
+            handlers: vec![],
         }
     }
 }
 
-
-impl Handler for RouterHandler<'_> {
-    fn handle(&self, req: &Request, context: &Exchange) -> Box<dyn Future<Item=HttpResponse, Error=RigError>> {
-        let mut path = Path::new(req.req.path());
-        let found_route = self.routers.recognize(&mut path);
-
-        debug!("router handler process, path: {}, matched: {}", req.req.path(), found_route.is_some());
-
-        if found_route.is_none() {
-            return Box::new(err(RigError::NotFoundPath));
+impl Handler for ComposeHandler {
+    fn handle(&self, req: &Request, context: &mut Exchange) -> Option<FutureResponse> {
+        for h in self.handlers.iter() {
+            match h.handle(req, context) {
+                Some(resp) => {
+                    return Option::Some(resp);
+                }
+                None => {
+                    continue;
+                }
+            }
         }
-
-        *context.api.borrow_mut() = Option::Some((*(found_route.unwrap().0)).clone());
-        context.handler_chain.handle(req, context)
+        unreachable!("never be in here");
     }
 }
+
+
+impl ComposeHandler {
+    pub fn first(&self) -> &dyn Handler {
+        return self.handlers[0].as_ref();
+    }
+
+    pub fn next(&self) -> &dyn Handler {
+        let mut mut_current = self.current.borrow_mut();
+        let next = *mut_current + 1;
+        *mut_current = next;
+        return self.handlers[next].as_ref();
+    }
+
+    pub fn append(&mut self, handler: Box<dyn Handler>) -> &mut Self {
+        self.handlers.push(handler);
+        return self;
+    }
+}
+
+
 
 /// DirectDispatcher
-pub struct DirectDispatcher {
-    pub env_destination: Option<String>,
-}
+pub struct DirectDispatcher {}
 
 impl Default for DirectDispatcher {
     fn default() -> Self {
-        DirectDispatcher {
-            env_destination: option_env!("rig_destination")
-                .map(|it| it.to_string())
-        }
+        DirectDispatcher {}
     }
 }
 
 impl Handler for DirectDispatcher {
-    fn handle(&self, req: &Request, exchange: &Exchange) -> Box<dyn Future<Item=HttpResponse, Error=RigError>> {
-        let api = exchange.api.borrow_mut();
-        let dest = (*api).as_ref().unwrap().path.as_str();
-        let resource_def = ResourceDef::new(dest);
+    fn handle(&self, req: &Request, exchange: &mut Exchange) -> Option<FutureResponse> {
+        let path = exchange.api.as_ref().unwrap().path.as_str();
+        let resource_def = ResourceDef::new(path);
         let mut path = Path::new(req.req.path());
         let _ = resource_def.match_path(&mut path);
-
-        let mut dest = match &self.env_destination {
-            Some(it) => it.clone(),
-            None => (*api).as_ref().unwrap().destination.destination.to_string(),
-        };
-
+        let mut dest = exchange.context
+            .definition.as_ref().unwrap().dispatcher.destination.clone();
         path.iter()
             .for_each(|it| {
                 let (k, v) = it;
@@ -99,8 +96,9 @@ impl Handler for DirectDispatcher {
         };
 
         debug!("DirectDispatcher Final Dest: {}", dest);
-        exchange.context.borrow_mut().destination = Option::Some(dest);
-        exchange.handler_chain.handle(req, exchange)
+        exchange.context.destination = Some(dest);
+
+        CONTINUE
     }
 }
 
@@ -116,17 +114,16 @@ impl Default for AgentRequestHandler {
 }
 
 impl Handler for AgentRequestHandler {
-    fn handle(&self, req: &Request, exchange: &Exchange) -> Box<dyn Future<Item=HttpResponse, Error=RigError>> {
-        let context = exchange.context.borrow_mut();
-        let destination = context.destination.as_ref().unwrap();
+    fn handle(&self, req: &Request, exchange: &mut Exchange) -> Option<FutureResponse> {
+        let destination = exchange.context.destination.as_ref().unwrap().clone();
 
-        Box::new(
+        Option::Some(Box::new(
             self.client
                 .request(req.req.method().clone(), destination)
                 .send_body(req.body.clone())
                 .map_err(|e| {
                     error!("send request error {}", e);
-                    RigError::AgentRequest
+                    RigError::WrapError(Box::new(e))
                 })
                 .map(|mut res| {
                     let mut client_resp = HttpResponse::build(res.status());
@@ -143,9 +140,9 @@ impl Handler for AgentRequestHandler {
                         .map(move |b| client_resp.body(b))
                         .map_err(|e| {
                             error!("payload error {}", e);
-                            RigError::AgentResponse
+                            RigError::WrapError(Box::new(e))
                         })
                 })
-                .flatten())
+                .flatten()))
     }
 }

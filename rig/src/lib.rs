@@ -1,9 +1,13 @@
-extern crate serde;
+#![feature(matches_macro)]
+
+extern crate actix_web;
+#[macro_use]
+extern crate derive_builder;
 #[macro_use]
 extern crate lazy_static;
+extern crate serde;
 #[macro_use]
 extern crate serde_derive;
-extern crate actix_web;
 
 pub mod server;
 pub mod config;

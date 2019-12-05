@@ -9,7 +9,7 @@
           ],
           "dispatcher": {
             "name": "Direct",
-            "destination": "http://172.16.80.210:10083/performance/{args}"
+            "destination": "http://destination.com/other/{args}"
           }
         }
       ]

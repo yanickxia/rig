@@ -1,9 +1,10 @@
-extern crate tokio;
 extern crate futures;
-extern crate rig;
 extern crate log;
+extern crate rig;
+extern crate tokio;
 
 use log::info;
+
 use rig::config::settings;
 use rig::server::server;
 

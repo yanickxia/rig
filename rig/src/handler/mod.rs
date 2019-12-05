@@ -1,16 +1,25 @@
+use std::any::Any;
+use std::borrow::BorrowMut;
 use std::cell::RefCell;
+use std::ops::{Deref, DerefMut};
 
 use actix_web::{HttpRequest, HttpResponse, web};
 use futures::Future;
+use futures::future::err;
 
-use crate::api::Api;
+use crate::api::{Api, Definition, Dispatcher};
 use crate::error::RigError;
+use crate::handler::handlers::ComposeHandler;
 
 pub mod handlers;
-#[cfg(test)]
-pub mod handlers_tests;
 pub mod handlers_factory;
+pub mod filters;
+#[cfg(test)]
+pub mod filters_test;
+pub mod filters_factory;
+pub mod router;
 
+const CONTINUE: Option<FutureResponse> = None;
 
 pub struct Request<'a> {
     pub req: &'a HttpRequest,
@@ -27,75 +36,48 @@ impl<'a> Request<'a> {
 }
 
 
+/// FutureResponse for Box wrap response
+type FutureResponse = Box<dyn Future<Item=HttpResponse, Error=RigError>>;
+
+
 pub trait Handler {
-    fn handle(&self, req: &Request, context: &Exchange) -> Box<dyn Future<Item=HttpResponse, Error=RigError>>;
+    fn handle(&self, req: &Request, exchange: &mut Exchange) -> Option<FutureResponse>;
+}
+
+pub trait Filter {
+    fn filter(&self, req: &Request, exchange: &mut Exchange) -> bool;
 }
 
 
-pub struct Exchange<'a> {
-    api: RefCell<Option<Api>>,
-    pub handler_chain: &'a HandlerChain<'a>,
-    context: RefCell<Context>,
+pub struct Exchange {
+    pub api: Option<Api>,
+    pub context: Context,
 }
 
 
-impl<'a> Exchange<'a> {
-    pub fn new(handler_chain: &'a HandlerChain<'a>) -> Self {
+impl Default for Exchange {
+    fn default() -> Self {
         Exchange {
-            api: RefCell::new(Option::None),
-            handler_chain,
-            context: RefCell::new(Context::default()),
+            api: None,
+            context: Context::default(),
         }
     }
 }
 
-
 pub struct Context {
-    pub destination: Option<String>
+    pub definition: Option<Definition>,
+    pub destination: Option<String>,
 }
 
 impl Default for Context {
     fn default() -> Self {
-        Context { destination: Option::None }
-    }
-}
-
-
-pub struct HandlerChain<'a> {
-    current: RefCell<usize>,
-    handlers: Vec<&'a dyn Handler>,
-}
-
-impl Default for HandlerChain<'_> {
-    fn default() -> Self {
-        HandlerChain {
-            current: RefCell::new(0),
-            handlers: vec![],
+        Context {
+            definition: None,
+            destination: None,
         }
     }
 }
 
-impl Handler for HandlerChain<'_> {
-    fn handle(&self, req: &Request, context: &Exchange) -> Box<dyn Future<Item=HttpResponse, Error=RigError>> {
-        return self.next().handle(req, context);
-    }
-}
-
-
-impl<'a> HandlerChain<'a> {
-    pub fn first(&self) -> &dyn Handler {
-        return self.handlers[0];
-    }
-
-    pub fn next(&self) -> &dyn Handler {
-        let mut mut_current = self.current.borrow_mut();
-        let next = *mut_current + 1;
-        *mut_current = next;
-        return self.handlers[next];
-    }
-
-    pub fn append(&mut self, handler: &'a dyn Handler) -> &mut Self {
-        self.handlers.push(handler);
-        return self;
-    }
+fn error_response(error: RigError) -> Option<FutureResponse> {
+    Some(Box::new(err(error)))
 }

@@ -1,30 +1,19 @@
 use std::collections::HashMap;
 
+use crate::api::{Api, Definition};
 use crate::config::settings;
-use crate::handler::{Handler};
-use crate::handler::handlers::{AgentRequestHandler, DirectDispatcher, RouterHandler};
+use crate::handler::filters_factory::FilterFactory;
+use crate::handler::Handler;
+use crate::handler::handlers::{AgentRequestHandler, ComposeHandler, DirectDispatcher};
 
-pub struct HandlerFactory {
-    handlers: HashMap<&'static str, Box<dyn Handler>>
-}
+pub struct HandlerFactory {}
 
 impl HandlerFactory {
-    pub fn get(&self, name: &str) -> Box<&dyn Handler> {
-        Box::new(self.handlers.get(name).unwrap().as_ref())
+    pub fn new(definition: &Definition) -> Box<dyn Handler> {
+        let mut compose_handler = ComposeHandler::default();
+        compose_handler.append(Box::new(DirectDispatcher::default()));
+        compose_handler.append(Box::new(AgentRequestHandler::default()));
+
+        Box::new(compose_handler)
     }
 }
-
-impl Default for HandlerFactory {
-    fn default() -> Self {
-        let mut handlers: HashMap<&'static str, Box<dyn Handler>> = HashMap::new();
-
-        let _ = handlers.insert(std::any::type_name::<DirectDispatcher>(), Box::new(DirectDispatcher::default()));
-        let _ = handlers.insert(std::any::type_name::<AgentRequestHandler>(), Box::new(AgentRequestHandler::default()));
-        let _ = handlers.insert(std::any::type_name::<RouterHandler>(), Box::new(RouterHandler::new(&settings::APIS)));
-
-        HandlerFactory {
-            handlers
-        }
-    }
-}
-

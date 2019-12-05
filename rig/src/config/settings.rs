@@ -5,7 +5,7 @@ use crate::api::Api;
 
 lazy_static! {
     pub static ref SETTINGS: Settings = Settings::load().unwrap();
-    pub static ref APIS: Vec<Api> = Api::load().unwrap();
+    pub static ref APIS: Vec<Api> = Apis::load().unwrap();
 }
 
 #[derive(Debug, Deserialize)]
@@ -34,10 +34,17 @@ impl Settings {
     }
 }
 
-impl Api {
-    pub fn load() -> Result<Vec<Self>, ConfigError> {
+impl Apis {
+    pub fn load() -> Result<Vec<Api>, ConfigError> {
         let mut s = Config::new();
         s.merge(File::with_name("config/api.json"))?;
+        debug!("Loaded API Configurations: {:?}", s);
+        s.try_into::<Apis>().map(|it| it.apis)
+    }
+
+    pub fn file_load(file: &str) -> Result<Vec<Api>, ConfigError> {
+        let mut s = Config::new();
+        s.merge(File::with_name(file))?;
         debug!("Loaded API Configurations: {:?}", s);
         s.try_into::<Apis>().map(|it| it.apis)
     }
