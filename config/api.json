@@ -2,14 +2,14 @@
   "apis": [
     {
       "id": 1,
-      "path": "/test/{args}",
+      "path": "/test/{args:.*}",
       "handlers": [
         {
           "filters": [
           ],
           "dispatcher": {
             "name": "Direct",
-            "destination": "http://172.16.80.210:10083/performance/{args}"
+            "destination": "http://http://10.10.30.51:30375/{args}"
           }
         }
       ]
