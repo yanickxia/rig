@@ -9,7 +9,7 @@
           ],
           "dispatcher": {
             "name": "Direct",
-            "destination": "http://http://10.10.30.51:30375/{args}"
+            "destination": "http://10.10.30.51:30375/{args}"
           }
         }
       ]
