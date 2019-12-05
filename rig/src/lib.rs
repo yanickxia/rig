@@ -1,5 +1,3 @@
-#![feature(matches_macro)]
-
 extern crate actix_web;
 #[macro_use]
 extern crate derive_builder;
