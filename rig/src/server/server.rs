@@ -1,28 +1,30 @@
 use std::net::SocketAddr;
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, mpsc, RwLock};
+use std::thread;
+use std::time::Duration;
 
 use actix_web::{
     App, HttpRequest, HttpResponse, HttpServer, web,
 };
+use actix_web::client::Client;
 use futures::Future;
-use futures::future::{err, ok};
+use futures::future::ok;
 use log::info;
 
-use crate::api::Api;
 use crate::config::settings;
 use crate::error::RigError;
 use crate::handler::{Exchange, Handler, Request};
-use crate::handler::handlers::{AgentRequestHandler, ComposeHandler, DirectDispatcher};
+use crate::handler::handler_provider;
 use crate::handler::router::RouterHandler;
 
 fn forward(req: HttpRequest,
            body: web::Bytes,
-           share_handler: web::Data<Arc<RwLock<RouterHandler>>>,
+           client: web::Data<Client>,
 ) -> impl Future<Item=HttpResponse, Error=RigError> {
-    let handler = share_handler.get_ref().clone();
-    let route_handler = handler.read().unwrap();
+    let handler = &handler_provider::HANDLER_PROVIDER;
+    let route_handler = handler.current.read().unwrap();
     let mut exchange = Exchange::default();
-    match route_handler.handle(&Request::new(&req, &body), &mut exchange) {
+    match route_handler.handle(&Request::new(&req, &body, client.get_ref()), &mut exchange) {
         Some(result) => {
             result
         }
@@ -34,23 +36,18 @@ fn forward(req: HttpRequest,
 
 pub fn start_server() {
     let settings = &settings::SETTINGS;
-    let api = &settings::APIS;
     let port = settings.server.port;
     let addr = ("0.0.0.0:".to_owned() + port.to_string().as_str()).parse::<SocketAddr>().unwrap();
     info!("Listen at: {}", addr);
 
+    let _ = handler_provider::scheduler_refresh_router_handler();
+
     HttpServer::new(
         || App::new()
-            .data(shared_handler())
+            .data(Client::default())
             .default_service(web::route().to_async(forward)))
         .bind(addr)
         .unwrap()
         .run()
-        .unwrap()
-}
-
-fn shared_handler() -> Arc<RwLock<RouterHandler>> {
-    let apis = &settings::APIS;
-    let router_handler = RouterHandler::new(&apis);
-    Arc::new(RwLock::new(router_handler))
+        .unwrap();
 }

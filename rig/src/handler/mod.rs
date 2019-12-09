@@ -1,15 +1,12 @@
-use std::any::Any;
-use std::borrow::BorrowMut;
-use std::cell::RefCell;
-use std::ops::{Deref, DerefMut};
+use std::collections::HashMap;
 
 use actix_web::{HttpRequest, HttpResponse, web};
+use actix_web::client::Client;
 use futures::Future;
 use futures::future::err;
 
-use crate::api::{Api, Definition, Dispatcher};
+use crate::api::{Api, Definition};
 use crate::error::RigError;
-use crate::handler::handlers::ComposeHandler;
 
 pub mod handlers;
 pub mod handlers_factory;
@@ -18,19 +15,22 @@ pub mod filters;
 pub mod filters_test;
 pub mod filters_factory;
 pub mod router;
+pub mod handler_provider;
 
 const CONTINUE: Option<FutureResponse> = None;
 
 pub struct Request<'a> {
     pub req: &'a HttpRequest,
     pub body: &'a web::Bytes,
+    pub client: &'a Client,
 }
 
 impl<'a> Request<'a> {
-    pub fn new(req: &'a HttpRequest, body: &'a web::Bytes) -> Self {
+    pub fn new(req: &'a HttpRequest, body: &'a web::Bytes, client: &'a Client) -> Self {
         Request {
             req,
             body,
+            client,
         }
     }
 }
@@ -40,11 +40,11 @@ impl<'a> Request<'a> {
 type FutureResponse = Box<dyn Future<Item=HttpResponse, Error=RigError>>;
 
 
-pub trait Handler {
+pub trait Handler: Sync + Send {
     fn handle(&self, req: &Request, exchange: &mut Exchange) -> Option<FutureResponse>;
 }
 
-pub trait Filter {
+pub trait Filter: Sync + Send {
     fn filter(&self, req: &Request, exchange: &mut Exchange) -> bool;
 }
 
@@ -52,6 +52,7 @@ pub trait Filter {
 pub struct Exchange {
     pub api: Option<Api>,
     pub context: Context,
+    pub resolved_path_variables: Option<HashMap<String, String>>,
 }
 
 
@@ -60,6 +61,7 @@ impl Default for Exchange {
         Exchange {
             api: None,
             context: Context::default(),
+            resolved_path_variables: None,
         }
     }
 }

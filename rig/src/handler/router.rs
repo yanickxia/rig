@@ -1,39 +1,38 @@
 use std::convert::TryFrom;
 
-use actix_router::{Path, ResourceDef, Router};
+use actix_router::{Path, Router};
 use log::{debug, error, info};
 
 use crate::api::{Api, Definition};
 use crate::error::RigError;
-use crate::handler::{CONTINUE, error_response, Exchange, Filter, FutureResponse, Handler, Request};
-use crate::handler::filters::ComposeFilter;
+use crate::handler::{error_response, Exchange, Filter, FutureResponse, Handler, Request};
 use crate::handler::filters_factory::FilterFactory;
 use crate::handler::handlers_factory::HandlerFactory;
+use crate::http::path::PathParser;
 
 pub struct Processor {
-    api: Api,
+    pub api: Api,
+    path_parser: PathParser,
     handlers: Vec<(Box<dyn Filter>, Box<dyn Handler>)>,
 }
 
 
 pub struct RouterHandler {
-    routers: Router<Processor>
+    routers: Vec<Processor>
 }
 
 /// Router handler
 impl RouterHandler {
     pub fn new(apis: &Vec<Api>) -> Self {
-        let mut router_builder = Router::<Processor>::build();
-
-        apis.iter().for_each(
-            |it| {
-                let id = u16::try_from(it.id).unwrap();
-                let processor = Processor { api: it.clone(), handlers: RouterHandler::new_handlers(it) };
-                router_builder.path(it.path.as_str(), processor).0.set_id(id);
-            });
-
         RouterHandler {
-            routers: router_builder.finish()
+            routers: apis.iter().map(
+                |it| {
+                    Processor {
+                        api: it.clone(),
+                        path_parser: PathParser::new(it.path.as_str()),
+                        handlers: RouterHandler::new_handlers(it),
+                    }
+                }).collect()
         }
     }
 
@@ -51,9 +50,8 @@ impl RouterHandler {
 
 impl Default for RouterHandler {
     fn default() -> Self {
-        let router_builder = Router::<Processor>::build();
         RouterHandler {
-            routers: router_builder.finish()
+            routers: vec![]
         }
     }
 }
@@ -61,19 +59,27 @@ impl Default for RouterHandler {
 
 impl Handler for RouterHandler {
     fn handle(&self, req: &Request, exchange: &mut Exchange) -> Option<FutureResponse> {
-        let mut path = Path::new(req.req.path());
-        let found_route = self.routers.recognize(&mut path);
+        let request_path = req.req.path();
+        let found_result = self.routers.iter()
+            .find(|processor| {
+                let resolved = processor.path_parser.parse(request_path);
+                if resolved.0 {
+                    exchange.resolved_path_variables = Some(resolved.1);
+                    return true;
+                }
+                return false;
+            });
 
-        debug!("router handler process, path: {}, matched: {}", req.req.path(), found_route.is_some());
+        debug!("router handler process, path: {}, matched: {}", request_path, found_result.is_some());
 
-        if found_route.is_none() {
+        if found_result.is_none() {
             return error_response(RigError::NotFoundPath);
         }
 
-        exchange.api = Option::Some(found_route.unwrap().0.api.clone());
+        exchange.api = Some(found_result.unwrap().api.clone());
 
         let handler =
-            match found_route.unwrap().0.handlers.iter()
+            match found_result.unwrap().handlers.iter()
                 .find(|it| it.0.filter(req, exchange))
                 .map(|it| it.1.as_ref())
                 {

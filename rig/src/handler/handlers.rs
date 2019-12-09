@@ -1,29 +1,21 @@
-use std::borrow::BorrowMut;
 use std::cell::RefCell;
-use std::convert::TryFrom;
 
-use actix_router::{Path, ResourceDef, Router};
 use actix_web::client::Client;
 use actix_web::HttpResponse;
 use futures::{Future, Stream};
-use futures::future::err;
 use log::{debug, error, info};
 
-use crate::api::Api;
 use crate::error::RigError;
-use crate::handler::{CONTINUE, Exchange, Filter, FutureResponse, Handler, Request};
-use crate::handler::filters_factory::FilterFactory;
+use crate::handler::{CONTINUE, Exchange, FutureResponse, Handler, Request};
 
 /// HandlerChain
 pub struct ComposeHandler {
-    current: RefCell<usize>,
     handlers: Vec<Box<dyn Handler>>,
 }
 
 impl Default for ComposeHandler {
     fn default() -> Self {
         ComposeHandler {
-            current: RefCell::new(0),
             handlers: vec![],
         }
     }
@@ -51,19 +43,11 @@ impl ComposeHandler {
         return self.handlers[0].as_ref();
     }
 
-    pub fn next(&self) -> &dyn Handler {
-        let mut mut_current = self.current.borrow_mut();
-        let next = *mut_current + 1;
-        *mut_current = next;
-        return self.handlers[next].as_ref();
-    }
-
     pub fn append(&mut self, handler: Box<dyn Handler>) -> &mut Self {
         self.handlers.push(handler);
         return self;
     }
 }
-
 
 
 /// DirectDispatcher
@@ -77,13 +61,12 @@ impl Default for DirectDispatcher {
 
 impl Handler for DirectDispatcher {
     fn handle(&self, req: &Request, exchange: &mut Exchange) -> Option<FutureResponse> {
-        let path = exchange.api.as_ref().unwrap().path.as_str();
-        let resource_def = ResourceDef::new(path);
-        let mut path = Path::new(req.req.path());
-        let _ = resource_def.match_path(&mut path);
         let mut dest = exchange.context
             .definition.as_ref().unwrap().dispatcher.destination.clone();
-        path.iter()
+        exchange.resolved_path_variables
+            .as_ref()
+            .unwrap()
+            .iter()
             .for_each(|it| {
                 let (k, v) = it;
                 let replace_key = "{".to_owned() + k + "}";
@@ -103,13 +86,11 @@ impl Handler for DirectDispatcher {
 }
 
 /// proxy request handler
-pub struct AgentRequestHandler {
-    client: Client,
-}
+pub struct AgentRequestHandler {}
 
 impl Default for AgentRequestHandler {
     fn default() -> Self {
-        AgentRequestHandler { client: Default::default() }
+        AgentRequestHandler {}
     }
 }
 
@@ -118,7 +99,7 @@ impl Handler for AgentRequestHandler {
         let destination = exchange.context.destination.as_ref().unwrap().clone();
 
         Option::Some(Box::new(
-            self.client
+            req.client
                 .request(req.req.method().clone(), destination)
                 .send_body(req.body.clone())
                 .map_err(|e| {

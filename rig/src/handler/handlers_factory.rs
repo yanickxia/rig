@@ -1,8 +1,4 @@
-use std::collections::HashMap;
-
-use crate::api::{Api, Definition};
-use crate::config::settings;
-use crate::handler::filters_factory::FilterFactory;
+use crate::api::Definition;
 use crate::handler::Handler;
 use crate::handler::handlers::{AgentRequestHandler, ComposeHandler, DirectDispatcher};
 

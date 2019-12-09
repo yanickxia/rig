@@ -12,3 +12,4 @@ pub mod config;
 pub mod handler;
 pub mod error;
 pub mod api;
+pub mod http;

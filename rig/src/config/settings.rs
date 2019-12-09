@@ -17,12 +17,24 @@ pub struct Server {
 pub struct Settings {
     pub debug: bool,
     pub server: Server,
+    pub tasks: Tasks,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct Apis {
     pub apis: Vec<Api>
 }
+
+#[derive(Debug, Deserialize)]
+pub struct Tasks {
+    pub api: ApiTask
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ApiTask {
+    pub interval: u64
+}
+
 
 impl Settings {
     pub fn load() -> Result<Self, ConfigError> {
